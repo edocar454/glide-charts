@@ -5,9 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Inline Chart</title>
 
-<!-- Highcharts core + all optional modules -->
+<!-- Highcharts core first -->
 <script src="https://code.highcharts.com/highcharts.js"></script>
+
+<!-- highcharts-more enables polar, radar, gauge, bubble, etc. -->
 <script src="https://code.highcharts.com/highcharts-more.js"></script>
+
+<!-- Optional modules -->
 <script src="https://code.highcharts.com/modules/exporting.js"></script>
 <script src="https://code.highcharts.com/modules/export-data.js"></script>
 <script src="https://code.highcharts.com/modules/accessibility.js"></script>
@@ -17,31 +21,25 @@
 html, body {
   margin: 0;
   padding: 0;
-  height: auto;
   background: var(--highcharts-background-color, #fff);
   color: var(--highcharts-neutral-color-100, #000);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  height: auto;
   overflow: hidden;
 }
-
 .highcharts-figure {
-  display: block;
   width: 100%;
   max-width: 800px;
   margin: 0;
   padding: 0;
 }
-
 #container {
   width: 100%;
   height: auto;
   min-height: 350px;
 }
-
 .highcharts-description {
   display: none !important;
-  margin: 0;
-  padding: 0;
 }
 </style>
 </head>
@@ -77,6 +75,7 @@ html, body {
   const specParam = params.get('spec');
   const data = decodeBase64Url(specParam);
 
+  // --- Fallback ---
   if (!data) {
     Highcharts.chart('container', {
       title: { text: 'No chart data provided' },
@@ -85,7 +84,12 @@ html, body {
     return;
   }
 
-  // --- Render chart ---
+  // --- Ensure polar charts are registered ---
+  if (Highcharts && typeof Highcharts.chart === 'function' && !Highcharts.seriesTypes.polar) {
+    console.warn('highcharts-more not loaded properly; polar types unavailable.');
+  }
+
+  // --- Render the chart ---
   try {
     Highcharts.chart('container', data.chart || data);
   } catch (err) {
@@ -97,16 +101,13 @@ html, body {
   if (data.description && data.description.trim()) {
     descEl.style.display = "block";
     descEl.innerText = data.description;
-  } else {
-    descEl.style.display = "none";
   }
 
-  // --- Auto-resize for Glide or iframe ---
+  // --- Auto-resize for Glide ---
   function notifyParentHeight() {
     const height = document.getElementById('container').offsetHeight + 8;
     window.parent?.postMessage({ type: "resize", height }, "*");
   }
-
   notifyParentHeight();
   setTimeout(notifyParentHeight, 400);
   window.addEventListener("resize", notifyParentHeight);
