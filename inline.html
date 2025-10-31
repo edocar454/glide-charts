@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Inline Chart</title>
 
-<!-- Highcharts + modules -->
+<!-- Highcharts core + all optional modules -->
 <script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="https://code.highcharts.com/highcharts-more.js"></script>
 <script src="https://code.highcharts.com/modules/exporting.js"></script>
 <script src="https://code.highcharts.com/modules/export-data.js"></script>
 <script src="https://code.highcharts.com/modules/accessibility.js"></script>
@@ -16,11 +17,11 @@
 html, body {
   margin: 0;
   padding: 0;
+  height: auto;
   background: var(--highcharts-background-color, #fff);
   color: var(--highcharts-neutral-color-100, #000);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  height: auto;           /* don't stretch to viewport */
-  overflow: hidden;       /* remove extra scroll */
+  overflow: hidden;
 }
 
 .highcharts-figure {
@@ -33,17 +34,16 @@ html, body {
 
 #container {
   width: 100%;
-  height: auto;           /* chart decides its own height */
-  min-height: 0;          /* remove fallback gap */
+  height: auto;
+  min-height: 350px;
 }
 
 .highcharts-description {
-  display: none !important;  /* never reserve space for it */
+  display: none !important;
   margin: 0;
   padding: 0;
 }
 </style>
-
 </head>
 <body>
 
@@ -77,24 +77,22 @@ html, body {
   const specParam = params.get('spec');
   const data = decodeBase64Url(specParam);
 
-  // --- If no data, show placeholder ---
   if (!data) {
     Highcharts.chart('container', {
       title: { text: 'No chart data provided' },
       series: [{ data: [1, 2, 3] }]
     });
-    document.getElementById('description').style.display = "none";
     return;
   }
 
-  // --- Render the chart ---
+  // --- Render chart ---
   try {
     Highcharts.chart('container', data.chart || data);
   } catch (err) {
     console.error('Chart render error:', err);
   }
 
-  // --- Show description only if provided ---
+  // --- Optional description ---
   const descEl = document.getElementById('description');
   if (data.description && data.description.trim()) {
     descEl.style.display = "block";
@@ -103,17 +101,16 @@ html, body {
     descEl.style.display = "none";
   }
 
-function notifyParentHeight() {
-  const height = document.getElementById('container').offsetHeight;
-  window.parent?.postMessage({ type: "resize", height }, "*");
-}
+  // --- Auto-resize for Glide or iframe ---
+  function notifyParentHeight() {
+    const height = document.getElementById('container').offsetHeight + 8;
+    window.parent?.postMessage({ type: "resize", height }, "*");
+  }
 
-notifyParentHeight();
-setTimeout(notifyParentHeight, 400);
-window.addEventListener("resize", notifyParentHeight);
-Highcharts.addEvent(Highcharts.Chart, 'redraw', notifyParentHeight);
-
-
+  notifyParentHeight();
+  setTimeout(notifyParentHeight, 400);
+  window.addEventListener("resize", notifyParentHeight);
+  Highcharts.addEvent(Highcharts.Chart, 'redraw', notifyParentHeight);
 })();
 </script>
 </body>
