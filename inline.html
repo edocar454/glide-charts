@@ -103,8 +103,21 @@ html, body {
     descEl.style.display = "none";
   }
 
-  // --- Notify parent frame (Glide) to resize correctly ---
-  window.parent?.postMessage({ type: "resize", height: document.body.scrollHeight }, "*");
+  // --- Auto-resize: report actual height to parent ---
+  function notifyParentHeight() {
+    // Add a little buffer so parent doesn't clip bottom borders
+    const height = document.documentElement.scrollHeight + 8;
+    window.parent?.postMessage({ type: "resize", height }, "*");
+  }
+  
+  // Run on load and after Highcharts finishes animation
+  notifyParentHeight();
+  setTimeout(notifyParentHeight, 400);
+  window.addEventListener("resize", notifyParentHeight);
+  
+  // Also trigger when Highcharts redraws (e.g. legend toggle, tooltip events)
+  Highcharts.addEvent(Highcharts.Chart, 'redraw', notifyParentHeight);
+
 })();
 </script>
 </body>
