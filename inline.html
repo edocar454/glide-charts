@@ -26,43 +26,39 @@
 
 <script>
 (function() {
-  // Helper: decode base64url
+  // ✅ Robust Base64URL → JSON decoder (handles UTF-8 safely)
   function decodeBase64Url(str) {
-    str = str.replace(/-/g, '+').replace(/_/g, '/');
-    const pad = str.length % 4;
-    if (pad) str += '='.repeat(4 - pad);
+    if (!str) return null;
     try {
-      return atob(str);
+      str = str.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = str.length % 4;
+      if (pad) str += '='.repeat(4 - pad);
+      const binary = atob(str);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const jsonText = new TextDecoder().decode(bytes);
+      return JSON.parse(jsonText);
     } catch (e) {
-      console.error("Invalid base64url:", e);
+      console.error("❌ Decode error:", e);
       return null;
     }
   }
 
-  // Read ?spec=... parameter
+  // Get ?spec=... parameter
   const params = new URLSearchParams(window.location.search);
   const specParam = params.get('spec');
+  const config = decodeBase64Url(specParam);
 
-  let config;
-  if (specParam) {
-    try {
-      const jsonText = decodeBase64Url(specParam);
-      config = JSON.parse(jsonText);
-    } catch (err) {
-      console.error('Error parsing spec:', err);
-    }
-  }
-
-  // Default fallback if no spec provided
+  // If decoding failed, show fallback
   if (!config) {
-    config = {
-      chart: { type: 'column' },
-      title: { text: 'No Data Provided' },
+    Highcharts.chart('container', {
+      title: { text: 'No or invalid chart data' },
       series: [{ data: [1, 2, 3] }]
-    };
+    });
+    return;
   }
 
-  // Render the chart
+  // ✅ Render chart
   Highcharts.chart('container', config);
 })();
 </script>
