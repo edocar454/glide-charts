@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Inline Chart</title>
+
+<!-- Load Highcharts -->
+<script src="https://code.highcharts.com/highcharts.js"></script>
+
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  #container {
+    width: 100%;
+    height: 420px;
+  }
+</style>
+</head>
+<body>
+<div id="container"></div>
+
+<script>
+(function() {
+  // Helper: decode base64url
+  function decodeBase64Url(str) {
+    str = str.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = str.length % 4;
+    if (pad) str += '='.repeat(4 - pad);
+    try {
+      return atob(str);
+    } catch (e) {
+      console.error("Invalid base64url:", e);
+      return null;
+    }
+  }
+
+  // Read ?spec=... parameter
+  const params = new URLSearchParams(window.location.search);
+  const specParam = params.get('spec');
+
+  let config;
+  if (specParam) {
+    try {
+      const jsonText = decodeBase64Url(specParam);
+      config = JSON.parse(jsonText);
+    } catch (err) {
+      console.error('Error parsing spec:', err);
+    }
+  }
+
+  // Default fallback if no spec provided
+  if (!config) {
+    config = {
+      chart: { type: 'column' },
+      title: { text: 'No Data Provided' },
+      series: [{ data: [1, 2, 3] }]
+    };
+  }
+
+  // Render the chart
+  Highcharts.chart('container', config);
+})();
+</script>
+</body>
+</html>
