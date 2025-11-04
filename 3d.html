@@ -67,9 +67,17 @@ html, body {
   const payload = decodeBase64Url(specParam);
 
   // --- Extract data ---
-  const seriesData = payload?.points || [[1, 2, 3]];
+  let seriesData = payload?.points || [[1, 2, 3]];
+  if (Array.isArray(seriesData[0]) && Array.isArray(seriesData[0][0])) {
+    seriesData = seriesData.flat();
+  }
+
+  const labels = payload?.labels || [];
   const titleText = payload?.title || "3D Embedding Space";
   const subtitleText = payload?.subtitle || "Click and drag to rotate";
+
+  console.log("Loaded points:", seriesData.length);
+  console.log("Loaded labels:", labels.length);
 
   // --- Give points a 3D gradient look ---
   Highcharts.setOptions({
@@ -109,13 +117,31 @@ html, body {
     xAxis: { gridLineWidth: 1 },
     yAxis: { min: 0, max: 10, title: null },
     zAxis: { min: 0, max: 10 },
+    tooltip: {
+      useHTML: true,
+      pointFormatter: function () {
+        return `<b>${this.name}</b><br>
+                X: ${this.x.toFixed(2)}<br>
+                Y: ${this.y.toFixed(2)}<br>
+                Z: ${this.z.toFixed(2)}`;
+      }
+    },
     plotOptions: {
-      scatter: { width: 10, height: 10, depth: 10 }
+      scatter: {
+        width: 10,
+        height: 10,
+        depth: 10
+      }
     },
     series: [{
       name: 'Embeddings',
       colorByPoint: true,
-      data: seriesData
+      data: seriesData.map((p, i) => ({
+        x: p[0],
+        y: p[1],
+        z: p[2],
+        name: labels[i] || `Point ${i + 1}`
+      }))
     }]
   });
 
