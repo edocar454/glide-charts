@@ -3,16 +3,14 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>2D UMAP Embedding Viewer</title>
+<title>2D Embedding Visualizer</title>
 
 <!-- Highcharts -->
 <script src="https://code.highcharts.com/highcharts.js"></script>
-<script src="https://code.highcharts.com/modules/exporting.js"></script>
-<script src="https://code.highcharts.com/modules/export-data.js"></script>
 <script src="https://code.highcharts.com/modules/accessibility.js"></script>
-<script src="https://code.highcharts.com/themes/adaptive.js"></script>
-
-<!-- UMAP -->
+<!-- LZ-String for decompression -->
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+<!-- UMAP.js -->
 <script src="https://cdn.jsdelivr.net/npm/umap-js@1.3.3/lib/umap.min.js"></script>
 
 <style>
@@ -23,14 +21,13 @@ html, body {
   background: var(--highcharts-background-color, #fff);
   color: var(--highcharts-neutral-color-100, #000);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  overflow: hidden;
 }
 
 .highcharts-figure {
-  display: block;
-  width: 100%;
+  min-width: 300px;
   max-width: 900px;
   margin: 0 auto;
+  padding: 0;
 }
 
 #container {
@@ -48,59 +45,63 @@ html, body {
 <script>
 (async function() {
 
-  // --- UTF-8 safe Base64URL → JSON decoder ---
-  function decodeBase64Url(str) {
+  // --- Decode payload from ?spec= using LZ-String ---
+  function decodePayload(str) {
     if (!str) return null;
     try {
-      str = str.replace(/-/g, '+').replace(/_/g, '/');
-      const pad = str.length % 4;
-      if (pad) str += '='.repeat(4 - pad);
-      const binary = atob(str);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const jsonText = new TextDecoder().decode(bytes);
+      const jsonText = LZString.decompressFromEncodedURIComponent(str);
       return JSON.parse(jsonText);
     } catch (e) {
-      console.error("Decode error:", e);
+      console.error("❌ Decompression error:", e);
       return null;
     }
   }
 
-  // --- Read ?spec= param ---
+  // --- Get ?spec= parameter ---
   const params = new URLSearchParams(window.location.search);
   const specParam = params.get('spec');
-  const payload = decodeBase64Url(specParam);
+  const payload = decodePayload(specParam);
 
-  if (!payload || !Array.isArray(payload.embeddings)) {
+  if (!payload || !payload.embeddings) {
     Highcharts.chart('container', {
-      title: { text: 'No embeddings provided' },
+      title: { text: '⚠️ No valid data received' },
       series: [{ data: [] }]
     });
     return;
   }
 
-  // --- Run UMAP client-side ---
+  // --- UMAP Projection (N-D → 2D) ---
   const umap = new UMAP.UMAP({ nComponents: 2, nNeighbors: 15, minDist: 0.1 });
-const reduced = umap.fit(payload.embeddings);
+  let reduced;
+  try {
+    // In iframe: use sync (fit); outside: async (fitAsync)
+    const inIframe = window.self !== window.top;
+    reduced = inIframe ? umap.fit(payload.embeddings)
+                       : await umap.fitAsync(payload.embeddings);
+  } catch (err) {
+    console.warn("UMAP async failed, falling back to sync mode:", err);
+    reduced = umap.fit(payload.embeddings);
+  }
 
-  // --- Normalize 0–10 range ---
-  const flatVals = reduced.flat();
-  const minVal = Math.min(...flatVals);
-  const maxVal = Math.max(...flatVals);
-  const range = (maxVal - minVal) || 1;
+  // --- Group points by brand (color) ---
+  const labels = payload.labels || [];
+  const colors = payload.colors || [];
+  const seriesMap = {};
 
-  const scaledPoints = reduced.map(([x, y]) => [
-    ((x - minVal) / range) * 10,
-    ((y - minVal) / range) * 10
-  ]);
+  reduced.forEach((point, i) => {
+    const brand = labels[i] || "unknown";
+    const color = colors[i] || "#888";
+    if (!seriesMap[brand]) {
+      seriesMap[brand] = { name: brand, color, data: [] };
+    }
+    seriesMap[brand].data.push({
+      x: point[0],
+      y: point[1],
+      name: brand
+    });
+  });
 
-  // --- Build scatter data ---
-  const scatterData = scaledPoints.map((p, i) => ({
-    x: p[0],
-    y: p[1],
-    name: payload.labels?.[i] || `Point ${i + 1}`,
-    color: payload.colors?.[i] || undefined
-  }));
+  const series = Object.values(seriesMap);
 
   // --- Render chart ---
   Highcharts.chart('container', {
@@ -108,40 +109,36 @@ const reduced = umap.fit(payload.embeddings);
       type: 'scatter',
       zooming: { type: 'xy' }
     },
-    title: { text: payload.title || '2D UMAP Embedding Projection' },
-    subtitle: { text: payload.subtitle || 'Computed client-side with UMAP.js' },
-    xAxis: {
-      title: { text: 'UMAP-1' },
-      gridLineWidth: 1
+    title: {
+      text: payload.title || '2D Embedding Projection'
     },
-    yAxis: {
-      title: { text: 'UMAP-2' },
-      gridLineWidth: 1
+    subtitle: {
+      text: payload.subtitle || 'Reduced to 2D with UMAP'
     },
-    legend: { enabled: false },
-    tooltip: {
-      useHTML: true,
-      headerFormat: '',
-      pointFormat: '<b>{point.name}</b>'
-    },
+    xAxis: { title: { text: 'UMAP-1' } },
+    yAxis: { title: { text: 'UMAP-2' } },
+    legend: { enabled: true },
     plotOptions: {
       scatter: {
         marker: {
           radius: 3,
           symbol: 'circle',
-          fillOpacity: 0.6,
           states: {
-            hover: { enabled: true, lineColor: 'rgb(100,100,100)', fillOpacity: 1 }
+            hover: { enabled: true, lineColor: 'rgb(100,100,100)' }
           }
         },
-        jitter: { x: 0.01, y: 0.01 }
+        states: {
+          hover: { marker: { enabled: false } }
+        },
+        jitter: { x: 0.005, y: 0.005 }
       }
     },
-    series: [{
-      name: 'Embeddings',
-      colorByPoint: true,
-      data: scatterData
-    }]
+    tooltip: {
+      useHTML: true,
+      headerFormat: '',
+      pointFormat: '<b>{point.name}</b><br>UMAP-1: {point.x:.2f}<br>UMAP-2: {point.y:.2f}'
+    },
+    series
   });
 
 })();
