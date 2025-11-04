@@ -133,16 +133,17 @@ html, body {
         depth: 10
       }
     },
-    series: [{
-      name: 'Embeddings',
-      colorByPoint: true,
-      data: seriesData.map((p, i) => ({
-        x: p[0],
-        y: p[1],
-        z: p[2],
-        name: labels[i] || `Point ${i + 1}`
-      }))
-    }]
+  series: [{
+    name: 'Embeddings',
+    colorByPoint: true,
+    data: seriesData.map((p, i) => ({
+      x: p[0],
+      y: p[1],
+      z: p[2],
+      name: (payload?.labels && payload.labels[i]) || `Point ${i + 1}`,
+      color: (payload?.colors && payload.colors[i]) || undefined
+    }))
+  }]
   });
 
   // --- Enable 3D rotation ---
