@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>2D Embedding Viewer</title>
+<title>2D UMAP Embedding Viewer</title>
 
 <!-- Highcharts -->
 <script src="https://code.highcharts.com/highcharts.js"></script>
@@ -11,6 +11,9 @@
 <script src="https://code.highcharts.com/modules/export-data.js"></script>
 <script src="https://code.highcharts.com/modules/accessibility.js"></script>
 <script src="https://code.highcharts.com/themes/adaptive.js"></script>
+
+<!-- UMAP -->
+<script src="https://cdn.jsdelivr.net/npm/umap-js@1.3.3/lib/umap.min.js"></script>
 
 <style>
 html, body {
@@ -43,7 +46,7 @@ html, body {
 </figure>
 
 <script>
-(function() {
+(async function() {
 
   // --- UTF-8 safe Base64URL → JSON decoder ---
   function decodeBase64Url(str) {
@@ -68,26 +71,35 @@ html, body {
   const specParam = params.get('spec');
   const payload = decodeBase64Url(specParam);
 
-  // --- Extract data ---
-  const points = payload?.points || [];
-  const labels = payload?.labels || [];
-  const colors = payload?.colors || [];
-
-  // --- Fallback if empty ---
-  if (!points.length) {
+  if (!payload || !Array.isArray(payload.embeddings)) {
     Highcharts.chart('container', {
-      title: { text: 'No data provided' },
+      title: { text: 'No embeddings provided' },
       series: [{ data: [] }]
     });
     return;
   }
 
-  // --- Build scatter data for 2D ---
-  const scatterData = points.map((p, i) => ({
+  // --- Run UMAP client-side ---
+  const umap = new UMAP.UMAP({ nComponents: 2, nNeighbors: 15, minDist: 0.1 });
+  const reduced = await umap.fitAsync(payload.embeddings);
+
+  // --- Normalize 0–10 range ---
+  const flatVals = reduced.flat();
+  const minVal = Math.min(...flatVals);
+  const maxVal = Math.max(...flatVals);
+  const range = (maxVal - minVal) || 1;
+
+  const scaledPoints = reduced.map(([x, y]) => [
+    ((x - minVal) / range) * 10,
+    ((y - minVal) / range) * 10
+  ]);
+
+  // --- Build scatter data ---
+  const scatterData = scaledPoints.map((p, i) => ({
     x: p[0],
     y: p[1],
-    name: labels[i] || `Point ${i + 1}`,
-    color: colors[i] || undefined
+    name: payload.labels?.[i] || `Point ${i + 1}`,
+    color: payload.colors?.[i] || undefined
   }));
 
   // --- Render chart ---
@@ -96,17 +108,14 @@ html, body {
       type: 'scatter',
       zooming: { type: 'xy' }
     },
-    title: { text: payload?.title || '2D Embedding Projection' },
-    subtitle: { text: payload?.subtitle || 'Zoom, pan, and hover for details' },
+    title: { text: payload.title || '2D UMAP Embedding Projection' },
+    subtitle: { text: payload.subtitle || 'Computed client-side with UMAP.js' },
     xAxis: {
-      title: { text: 'X' },
-      startOnTick: true,
-      endOnTick: true,
-      showLastLabel: true,
+      title: { text: 'UMAP-1' },
       gridLineWidth: 1
     },
     yAxis: {
-      title: { text: 'Y' },
+      title: { text: 'UMAP-2' },
       gridLineWidth: 1
     },
     legend: { enabled: false },
@@ -120,11 +129,11 @@ html, body {
         marker: {
           radius: 3,
           symbol: 'circle',
+          fillOpacity: 0.6,
           states: {
-            hover: { enabled: true, lineColor: 'rgb(100,100,100)' }
+            hover: { enabled: true, lineColor: 'rgb(100,100,100)', fillOpacity: 1 }
           }
         },
-        states: { hover: { marker: { enabled: false } } },
         jitter: { x: 0.01, y: 0.01 }
       }
     },
