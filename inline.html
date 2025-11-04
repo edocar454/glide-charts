@@ -7,11 +7,7 @@
 
 <!-- Highcharts core first -->
 <script src="https://code.highcharts.com/highcharts.js"></script>
-
-<!-- highcharts-more enables polar, radar, gauge, bubble, etc. -->
 <script src="https://code.highcharts.com/highcharts-more.js"></script>
-
-<!-- Optional modules -->
 <script src="https://code.highcharts.com/modules/exporting.js"></script>
 <script src="https://code.highcharts.com/modules/export-data.js"></script>
 <script src="https://code.highcharts.com/modules/accessibility.js"></script>
@@ -21,25 +17,47 @@
 html, body {
   margin: 0;
   padding: 0;
+  height: 100%;
   background: var(--highcharts-background-color, #fff);
   color: var(--highcharts-neutral-color-100, #000);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
 }
+
 .highcharts-figure {
   width: 100%;
   max-width: 800px;
-  margin: 0;
+  margin: 0 auto;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
+
 #container {
   width: 100%;
   height: auto;
   min-height: 350px;
 }
+
 .highcharts-description {
   display: none !important;
+}
+
+/* hide the Highcharts context menu */
+.highcharts-contextbutton, .highcharts-menu {
+  display: none !important;
+}
+
+/* ensure legend sits centered below the chart */
+.highcharts-legend {
+  text-align: center !important;
+  justify-content: center !important;
+  margin-top: 8px !important;
 }
 </style>
 </head>
@@ -84,14 +102,16 @@ html, body {
     return;
   }
 
-  // --- Ensure polar charts are registered ---
-  if (Highcharts && typeof Highcharts.chart === 'function' && !Highcharts.seriesTypes.polar) {
-    console.warn('highcharts-more not loaded properly; polar types unavailable.');
-  }
-
   // --- Render the chart ---
   try {
-    Highcharts.chart('container', data.chart || data);
+    const chartOptions = data.chart || data;
+    chartOptions.exporting = { enabled: false }; // disable menu
+    chartOptions.legend = Object.assign({
+      align: 'center',
+      verticalAlign: 'bottom',
+      layout: 'horizontal'
+    }, chartOptions.legend || {});
+    Highcharts.chart('container', chartOptions);
   } catch (err) {
     console.error('Chart render error:', err);
   }
