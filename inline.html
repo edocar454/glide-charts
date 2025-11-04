@@ -102,16 +102,37 @@ html, body {
     return;
   }
 
-  // --- Render the chart ---
   try {
     const chartOptions = data.chart || data;
-    chartOptions.exporting = { enabled: false }; // disable menu
+
+    // 🔹 Force hide export / menu buttons
+    chartOptions.exporting = { enabled: false };
+
+    // 🔹 Force legend layout below chart (no overrides possible)
     chartOptions.legend = Object.assign({
       align: 'center',
       verticalAlign: 'bottom',
-      layout: 'horizontal'
+      layout: 'horizontal',
+      floating: false,
+      itemStyle: { fontSize: '12px' },
+      itemMarginTop: 4,
+      itemMarginBottom: 4
     }, chartOptions.legend || {});
-    Highcharts.chart('container', chartOptions);
+
+    // 🔹 Create chart
+    const chart = Highcharts.chart('container', chartOptions);
+
+    // 🔹 Reposition legend manually (for polar, radar, etc.)
+    chart.update({
+      legend: {
+        align: 'center',
+        verticalAlign: 'bottom',
+        layout: 'horizontal',
+        x: 0,
+        y: 10
+      }
+    }, false);
+    chart.redraw();
   } catch (err) {
     console.error('Chart render error:', err);
   }
