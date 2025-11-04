@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>2D Embedding Viewer</title>
+
+<!-- Highcharts -->
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="https://code.highcharts.com/modules/exporting.js"></script>
+<script src="https://code.highcharts.com/modules/export-data.js"></script>
+<script src="https://code.highcharts.com/modules/accessibility.js"></script>
+<script src="https://code.highcharts.com/themes/adaptive.js"></script>
+
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--highcharts-background-color, #fff);
+  color: var(--highcharts-neutral-color-100, #000);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+}
+
+.highcharts-figure {
+  display: block;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+#container {
+  width: 100%;
+  height: 600px;
+}
+</style>
+</head>
+<body>
+
+<figure class="highcharts-figure">
+  <div id="container"></div>
+</figure>
+
+<script>
+(function() {
+
+  // --- UTF-8 safe Base64URL → JSON decoder ---
+  function decodeBase64Url(str) {
+    if (!str) return null;
+    try {
+      str = str.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = str.length % 4;
+      if (pad) str += '='.repeat(4 - pad);
+      const binary = atob(str);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const jsonText = new TextDecoder().decode(bytes);
+      return JSON.parse(jsonText);
+    } catch (e) {
+      console.error("Decode error:", e);
+      return null;
+    }
+  }
+
+  // --- Read ?spec= param ---
+  const params = new URLSearchParams(window.location.search);
+  const specParam = params.get('spec');
+  const payload = decodeBase64Url(specParam);
+
+  // --- Extract data ---
+  const points = payload?.points || [];
+  const labels = payload?.labels || [];
+  const colors = payload?.colors || [];
+
+  // --- Fallback if empty ---
+  if (!points.length) {
+    Highcharts.chart('container', {
+      title: { text: 'No data provided' },
+      series: [{ data: [] }]
+    });
+    return;
+  }
+
+  // --- Build scatter data for 2D ---
+  const scatterData = points.map((p, i) => ({
+    x: p[0],
+    y: p[1],
+    name: labels[i] || `Point ${i + 1}`,
+    color: colors[i] || undefined
+  }));
+
+  // --- Render chart ---
+  Highcharts.chart('container', {
+    chart: {
+      type: 'scatter',
+      zooming: { type: 'xy' }
+    },
+    title: { text: payload?.title || '2D Embedding Projection' },
+    subtitle: { text: payload?.subtitle || 'Zoom, pan, and hover for details' },
+    xAxis: {
+      title: { text: 'X' },
+      startOnTick: true,
+      endOnTick: true,
+      showLastLabel: true,
+      gridLineWidth: 1
+    },
+    yAxis: {
+      title: { text: 'Y' },
+      gridLineWidth: 1
+    },
+    legend: { enabled: false },
+    tooltip: {
+      useHTML: true,
+      headerFormat: '',
+      pointFormat: '<b>{point.name}</b>'
+    },
+    plotOptions: {
+      scatter: {
+        marker: {
+          radius: 3,
+          symbol: 'circle',
+          states: {
+            hover: { enabled: true, lineColor: 'rgb(100,100,100)' }
+          }
+        },
+        states: { hover: { marker: { enabled: false } } },
+        jitter: { x: 0.01, y: 0.01 }
+      }
+    },
+    series: [{
+      name: 'Embeddings',
+      colorByPoint: true,
+      data: scatterData
+    }]
+  });
+
+})();
+</script>
+</body>
+</html>
