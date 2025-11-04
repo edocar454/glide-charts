@@ -81,7 +81,7 @@ html, body {
 
   // --- Run UMAP client-side ---
   const umap = new UMAP.UMAP({ nComponents: 2, nNeighbors: 15, minDist: 0.1 });
-  const reduced = await umap.fitAsync(payload.embeddings);
+const reduced = umap.fit(payload.embeddings);
 
   // --- Normalize 0–10 range ---
   const flatVals = reduced.flat();
